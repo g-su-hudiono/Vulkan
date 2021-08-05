@@ -1,0 +1,110 @@
+//  Copyright © 2021 Subph. All rights reserved.
+//
+
+#pragma once
+
+#include "common.h"
+#include "shader.h"
+#include "mesh.h"
+#include "buffer.h"
+#include "image.h"
+#include "camera.h"
+
+struct UniformBuffer {
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 proj;
+};
+
+class App {
+public:
+    
+    void run();
+
+private:
+
+    GLFWwindow* m_window;
+
+    std::vector<VkSurfaceFormatKHR> m_surfaceFormats;
+    std::vector<VkPresentModeKHR  > m_presentModes;
+
+    uint32_t m_graphicQueueIndex = 0;
+    uint32_t m_presentQueueIndex = 0;
+    VkQueue m_graphicQueue = VK_NULL_HANDLE;
+    VkQueue m_presentQueue = VK_NULL_HANDLE;
+
+    void cleanup();
+    
+    void initWindow();
+    void initVulkan();
+    
+    Shader* m_vertexShader;
+    Shader* m_pixelShader;
+    void createShader();
+
+    Mesh* m_pCube;
+    Mesh* m_pFloor;
+    void createGeometry();
+    
+    VkExtent2D m_extent;
+    VkFormat m_surfaceFormat;
+    VkSwapchainKHR m_swapchain = VK_NULL_HANDLE;
+    void createSwapchain();
+
+    VkRenderPass  m_renderPass = VK_NULL_HANDLE;
+    void createRenderPass();
+
+    uint32_t m_totalFrame = 0;
+    Image* m_depthImage;
+    std::vector<VkCommandBuffer> m_cmdBuffers;
+    std::vector<Image*>        m_fbImages;
+    std::vector<VkFramebuffer> m_fb;
+    std::vector<Buffer*>       m_uniformBuffer;
+    std::vector<VkSemaphore>   m_imageSemaphores;
+    std::vector<VkSemaphore>   m_renderSemaphores;
+    std::vector<VkFence>       m_commandFences;
+    void createFrameData();
+    
+    VkDescriptorPool             m_descPool      = VK_NULL_HANDLE;
+    VkDescriptorSetLayout        m_descSetLayout = VK_NULL_HANDLE;
+    VkDescriptorSet              m_descSet;
+    VkDescriptorSetLayoutBinding m_descLayoutBinding;
+    VkWriteDescriptorSet         m_writeDescSet;
+    void createDescriptor();
+
+    VkPipeline m_pipeline;
+    VkPipelineLayout m_pipelineLayout;
+    void createPipeline();
+
+    UniformBuffer m_mvp{};
+    uint32_t m_currentFrame = 0;
+    Camera* m_camera;
+    void process();
+    
+    // device.cpp
+    std::vector<const char*> deviceExtensions;
+    std::vector<const char*> validationLayers;
+
+    VkDebugUtilsMessengerEXT m_debugMessenger = VK_NULL_HANDLE;
+    VkInstance   m_instance = VK_NULL_HANDLE;
+    VkSurfaceKHR m_surface  = VK_NULL_HANDLE;
+    VkDevice     m_device   = VK_NULL_HANDLE;
+    VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
+
+    void cleanupDevice();
+    void createInstance();
+    void pickPhysicalDevice();
+    void createLogicalDevice();
+    VkSurfaceFormatKHR getSwapchainSurfaceFormat();
+    VkPresentModeKHR   getSwapchainPresentMode();
+
+    // command.cpp
+    VkCommandPool m_commandPool = VK_NULL_HANDLE;
+
+    void createCommandPool();
+    std::vector<VkCommandBuffer> createCommandBuffers( uint32_t count = 1 );
+    VkCommandBuffer beginSingleTimeCommands();
+    void endSingleTimeCommands( VkCommandBuffer commandBuffer );
+
+
+};
