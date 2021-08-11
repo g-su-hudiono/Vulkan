@@ -237,7 +237,7 @@ void App::createFrameData() {
         framebufferInfo.height          = HEIGHT;
         framebufferInfo.layers          = 1;
 
-        VkResult result = vkCreateFramebuffer( m_device, &framebufferInfo, nullptr, &m_fb[0] );
+        VkResult result = vkCreateFramebuffer( m_device, &framebufferInfo, nullptr, &m_fb[i] );
         CHECK_VKRESULT( result, "failed to create framebuffer!" );
 
         m_uniformBuffer[i] = new Buffer(m_device, m_physicalDevice);
@@ -516,5 +516,7 @@ void App::process() {
         presentInfo.pImageIndices      = &imageIndex;
 
         result = vkQueuePresentKHR(m_presentQueue, &presentInfo);
+
+        m_currentFrame = ( m_currentFrame + 1 ) % m_totalFrame;
     }
 }
