@@ -6,9 +6,6 @@
 #include "app.h"
 #include "helper.h"
 
-#define WIDTH   800
-#define HEIGHT  600
-
 void App::run() {
     initWindow();
     initVulkan();
@@ -35,7 +32,7 @@ void App::cleanup() {
         vkDestroySemaphore( m_device, m_renderSemaphores[i], nullptr );
         vkDestroyFramebuffer( m_device, m_fb[i], nullptr );
 
-        m_uniformBuffer[i]->cleanup();
+        m_uniformBuffers[i]->cleanup();
         m_fbImages[i]->cleanupImageView();
     }
     m_depthImage->cleanup();
@@ -75,13 +72,20 @@ void App::initVulkan() {
     createShader();
     createGeometry();
 
-    createSwapchain();
-    createRenderPass();
 
-    createFrameData();
+    createOffscreenRenderPass();
+    createOffscreenFramedata();
 
     createDescriptor();
-    createPipeline();
+    createGraphicsPipeline();
+
+    //createSwapchain();
+    //createRenderPass();
+
+    //createFrameData();
+
+    //createDescriptor();
+    //createPipeline();
 
     m_camera = new Camera();
     m_mvp.view = m_camera->getViewMatrix();
@@ -210,7 +214,7 @@ void App::createFrameData() {
 
     m_fb.resize( m_totalFrame ); 
     m_fbImages.resize( m_totalFrame );
-    m_uniformBuffer.resize( m_totalFrame );
+    m_uniformBuffers.resize( m_totalFrame );
     m_imageSemaphores.resize( m_totalFrame );
     m_renderSemaphores.resize( m_totalFrame );
     m_commandFences.resize( m_totalFrame );
@@ -219,7 +223,7 @@ void App::createFrameData() {
     m_cmdBuffers = createCommandBuffers( m_totalFrame );
 
     m_depthImage = new Image(m_device, m_physicalDevice);
-    m_depthImage->createForDepth( {WIDTH, HEIGHT}, 1 );
+    m_depthImage->createForDepth( {WIDTH, HEIGHT} );
 
     for ( size_t i = 0; i < m_totalFrame; i++ ) {
         m_fbImages[i] = new Image( m_device, m_physicalDevice );
@@ -240,9 +244,9 @@ void App::createFrameData() {
         VkResult result = vkCreateFramebuffer( m_device, &framebufferInfo, nullptr, &m_fb[i] );
         CHECK_VKRESULT( result, "failed to create framebuffer!" );
 
-        m_uniformBuffer[i] = new Buffer(m_device, m_physicalDevice);
-        m_uniformBuffer[i]->setup( sizeof( UniformBuffer ), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT );
-        m_uniformBuffer[i]->create();
+        m_uniformBuffers[i] = new Buffer(m_device, m_physicalDevice);
+        m_uniformBuffers[i]->setup( sizeof( UniformBuffer ), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT );
+        m_uniformBuffers[i]->create();
 
         VkSemaphoreCreateInfo semaphoreInfo{};
         semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -295,7 +299,7 @@ void App::createDescriptor() {
     result = vkAllocateDescriptorSets(m_device, &allocInfo, &m_descSet);
     CHECK_VKRESULT(result, "failed to allocate descriptor set!");
 
-    VkDescriptorBufferInfo bufferInfo = m_uniformBuffer[0]->getBufferInfo();
+    VkDescriptorBufferInfo bufferInfo = m_uniformBuffer->getBufferInfo();
     m_writeDescSet.sType  = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     m_writeDescSet.dstBinding      = 0;
     m_writeDescSet.descriptorCount = 1;
@@ -437,7 +441,7 @@ void App::process() {
                 vkCmdSetLineWidth(commandBuffer, 1.0f);
 
                 m_mvp.model = m_pCube->getMatrix();
-                m_uniformBuffer[m_currentFrame]->fillBuffer( &m_mvp, sizeof( UniformBuffer ) );
+                m_uniformBuffers[m_currentFrame]->fillBuffer( &m_mvp, sizeof( UniformBuffer ) );
 
         
                 VkRenderPassBeginInfo renderBeginInfo{};

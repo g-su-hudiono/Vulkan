@@ -10,6 +10,9 @@
 #include "image.h"
 #include "camera.h"
 
+#define WIDTH   800
+#define HEIGHT  600
+
 struct UniformBuffer {
     glm::mat4 model;
     glm::mat4 view;
@@ -59,7 +62,7 @@ private:
     std::vector<VkCommandBuffer> m_cmdBuffers;
     std::vector<Image*>        m_fbImages;
     std::vector<VkFramebuffer> m_fb;
-    std::vector<Buffer*>       m_uniformBuffer;
+    std::vector<Buffer*>       m_uniformBuffers;
     std::vector<VkSemaphore>   m_imageSemaphores;
     std::vector<VkSemaphore>   m_renderSemaphores;
     std::vector<VkFence>       m_commandFences;
@@ -80,6 +83,19 @@ private:
     uint32_t m_currentFrame = 0;
     Camera* m_camera;
     void process();
+
+    // offscreen.cpp
+    VkRenderPass m_offscreenRenderPass = VK_NULL_HANDLE;
+    void createOffscreenRenderPass();
+
+    Image*  m_offscreenImage;
+    Image*  m_offscreenDepth;
+    Buffer* m_uniformBuffer;
+    VkFramebuffer m_offscreenFramebuffer;
+    void createOffscreenFramedata();
+
+    void createGraphicsPipeline();
+
     
     // device.cpp
     std::vector<const char*> deviceExtensions;
