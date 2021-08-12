@@ -96,6 +96,13 @@ private:
 
     void createGraphicsPipeline();
 
+    // vkray.cpp
+    void initRayTracing();
+    void createBottomLevelAS();
+    void createTopLevelAS();
+    void createRtDescriptorSet();
+    void createRtPipeline();
+    void createRtShaderBindingTable();
     
     // device.cpp
     std::vector<const char*> deviceExtensions;
