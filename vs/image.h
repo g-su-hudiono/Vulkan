@@ -16,9 +16,11 @@ public:
     void cleanup();
     void cleanupImageView();
     
-    void createForDepth     (Size<int32_t> size, int32_t mipLevels);
+    void createForDepth     (Size<int32_t> size);
     void createForSwapchain (VkImage image, VkFormat imageFormat);
+    void createForOffscreen (Size<int32_t> size);
     void allocateImageMemory();
+    void createSampler      ();
     
     VkImage          getImage      ();
     VkImageView      getImageView  ();
@@ -32,6 +34,7 @@ private:
     VkImage          m_image          = VK_NULL_HANDLE;
     VkImageView      m_imageView      = VK_NULL_HANDLE;
     VkDeviceMemory   m_imageMemory    = VK_NULL_HANDLE;
+    VkSampler        m_sampler        = VK_NULL_HANDLE;
 
     static VkFormat ChooseDepthFormat( VkPhysicalDevice physicalDevice );
     static VkImageCreateInfo     GetDefaultImageCreateInfo();

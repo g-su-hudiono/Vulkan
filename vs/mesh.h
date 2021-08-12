@@ -31,17 +31,18 @@ public:
 
     Buffer* m_vertexBuffer = nullptr;
     Buffer* m_indexBuffer = nullptr;
-    std::vector<int32_t>  m_indices;
+
+    std::vector<int32_t>   m_indices;
+    std::vector<glm::vec3> m_positions;
+    std::vector<glm::vec3> m_normals;
+    std::vector<glm::vec3> m_colors;
+    std::vector<glm::vec2> m_texCoords;
 
 private:
     
     VkDevice         m_device         = VK_NULL_HANDLE;
     VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
     
-    std::vector<glm::vec3> m_positions;
-    std::vector<glm::vec3> m_normals;
-    std::vector<glm::vec3> m_colors;
-    std::vector<glm::vec2> m_texCoords;
 
     glm::mat4 m_model = glm::mat4(1.0f);
     std::vector<VkVertexInputAttributeDescription> attributeDescriptions;

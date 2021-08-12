@@ -177,7 +177,9 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="device.cpp" />
     <ClCompile Include="mesh.cpp" />
+    <ClCompile Include="offscreen.cpp" />
     <ClCompile Include="shader.cpp" />
+    <ClCompile Include="vkray.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="app.h" />
