@@ -17,30 +17,31 @@ void App::createBottomLevelAS() {
     VkBuffer indexBuffer = m_pCube->m_indexBuffer->getBuffer();
     VkBufferDeviceAddressInfo indexInfo = { VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO };
     indexInfo.buffer = indexBuffer;
+
     VkDeviceAddress indexAddress = vkGetBufferDeviceAddress( m_device, &indexInfo );
 
-    VkAccelerationStructureGeometryTrianglesDataKHR triangles;
+    VkAccelerationStructureGeometryTrianglesDataKHR triangles{};
     triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
     triangles.vertexFormat             = VK_FORMAT_R32G32B32_SFLOAT;
     triangles.vertexData.deviceAddress = vertexAddress;
     triangles.vertexStride             = 1;
     triangles.indexType                = VK_INDEX_TYPE_UINT32;
     triangles.indexData.deviceAddress  = indexAddress;
-    triangles.maxVertex                = m_pCube->m_positions.size();
+    triangles.maxVertex                = static_cast<uint32_t>(m_pCube->m_positions.size());
 
-    VkAccelerationStructureGeometryKHR geometry;
+    VkAccelerationStructureGeometryKHR geometry{};
     geometry.sType              = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
     geometry.geometryType       = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
     geometry.flags              = VK_GEOMETRY_OPAQUE_BIT_KHR;
     geometry.geometry.triangles = triangles;
 
-    VkAccelerationStructureBuildRangeInfoKHR offset;
+    VkAccelerationStructureBuildRangeInfoKHR offset{};
     offset.firstVertex     = 0;
-    offset.primitiveCount  = m_pCube->m_indices.size() / 3;
+    offset.primitiveCount  = static_cast< uint32_t >( m_pCube->m_indices.size() / 3 );
     offset.primitiveOffset = 0;
     offset.transformOffset = 0;
 
-    VkAccelerationStructureBuildGeometryInfoKHR buildInfo;
+    VkAccelerationStructureBuildGeometryInfoKHR buildInfo{};
     buildInfo.sType         = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
     buildInfo.flags         = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
     buildInfo.mode          = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
@@ -55,16 +56,27 @@ void App::createBottomLevelAS() {
     uint32_t maxPrimCount = offset.primitiveCount;
 
     VkAccelerationStructureBuildSizesInfoKHR sizeInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR };
-    vkGetAccelerationStructureBuildSizesKHR( m_device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &buildInfo,
+
+    PFN_vkGetAccelerationStructureBuildSizesKHR GetAccelerationStructureBuildSizes = 
+        (PFN_vkGetAccelerationStructureBuildSizesKHR) vkGetInstanceProcAddr( m_instance, "vkGetAccelerationStructureBuildSizesKHR" );
+    GetAccelerationStructureBuildSizes( m_device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &buildInfo,
         &maxPrimCount, &sizeInfo );
+
+    //vkGetAccelerationStructureBuildSizesKHR( m_device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &buildInfo,
+    //    &maxPrimCount, &sizeInfo );
 
     VkAccelerationStructureCreateInfoKHR createInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR };
     createInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
     createInfo.size = sizeInfo.accelerationStructureSize;
 
 
-    VkAccelerationStructureKHR accelStructure;
-    vkCreateAccelerationStructureKHR( m_device, &createInfo, nullptr, &accelStructure );
+    VkAccelerationStructureKHR accelStructure{};
+
+    PFN_vkCreateAccelerationStructureKHR CreateAccelerationStructureKHR = 
+        (PFN_vkCreateAccelerationStructureKHR) vkGetInstanceProcAddr( m_instance, "vkCreateAccelerationStructureKHR" );
+    CreateAccelerationStructureKHR( m_device, &createInfo, nullptr, &accelStructure );
+
+    //vkCreateAccelerationStructureKHR( m_device, &createInfo, nullptr, &accelStructure );
 
     Buffer* accelStructureBuffer = new Buffer( m_device, m_physicalDevice );
     accelStructureBuffer->setup( createInfo.size, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT );
@@ -92,7 +104,11 @@ void App::createBottomLevelAS() {
     buildInfo.scratchData.deviceAddress = scratchAddress;
     const VkAccelerationStructureBuildRangeInfoKHR* accelRange = &offset;
 
-    vkCmdBuildAccelerationStructuresKHR( cmdBuffer, 1, &buildInfo, &accelRange );
+    PFN_vkCmdBuildAccelerationStructuresKHR CmdBuildAccelerationStructuresKHR =
+        ( PFN_vkCmdBuildAccelerationStructuresKHR )vkGetInstanceProcAddr( m_instance, "vkCmdBuildAccelerationStructuresKHR" );
+    CmdBuildAccelerationStructuresKHR( cmdBuffer, 1, &buildInfo, &accelRange );
+
+    //vkCmdBuildAccelerationStructuresKHR( cmdBuffer, 1, &buildInfo, &accelRange );
 
     // Since the scratch buffer is reused across builds, we need a barrier to ensure one build
     // is finished before starting the next one

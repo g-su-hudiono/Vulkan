@@ -87,6 +87,14 @@ void App::initVulkan() {
     //createDescriptor();
     //createPipeline();
 
+    initRayTracing();
+    createBottomLevelAS();
+    createTopLevelAS();
+    createRtDescriptorSet();
+    createRtPipeline();
+    createRtShaderBindingTable();
+    
+
     m_camera = new Camera();
     m_mvp.view = m_camera->getViewMatrix();
     m_mvp.proj = m_camera->getProjection( ( float )WIDTH / HEIGHT );
