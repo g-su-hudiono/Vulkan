@@ -155,6 +155,7 @@ void App::pickPhysicalDevice() {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
         VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+        VK_KHR_RAY_QUERY_EXTENSION_NAME,
         VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
         VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME
     };
@@ -164,14 +165,21 @@ void App::pickPhysicalDevice() {
     std::vector<VkPresentModeKHR>   presentModes;
     int graphicQueueIndex = 0;
     int presentQueueIndex = 0;
-
+    bool supportedDevice = false;
     for ( const auto& tempDevice : physicalDevices ) {
         VkPhysicalDeviceProperties properties;
         vkGetPhysicalDeviceProperties( tempDevice, &properties );
         LOG( properties.deviceName );
 
-        VkPhysicalDeviceBufferDeviceAddressFeatures bufferDeviceAdressFeature{};
-        bufferDeviceAdressFeature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+        VkPhysicalDeviceBufferDeviceAddressFeatures bufferDeviceAdressFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES };
+        VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
+        VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
+        VkPhysicalDeviceRayQueryFeaturesKHR rayQueryFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR };
+        VkPhysicalDeviceHostQueryResetFeatures queryResetFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES };
+        rayQueryFeature.pNext = &queryResetFeature;
+        rayTracingFeature.pNext = &rayQueryFeature;
+        accelerationFeature.pNext = &rayTracingFeature;
+        bufferDeviceAdressFeature.pNext = &accelerationFeature;
         VkPhysicalDeviceFeatures2 supportedFeatures{};
         supportedFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
         supportedFeatures.pNext = &bufferDeviceAdressFeature;
@@ -189,7 +197,16 @@ void App::pickPhysicalDevice() {
 
         if ( swapchainAdequate && hasFamilyIndex && extensionSupported &&
             supportedFeatures.features.samplerAnisotropy &&
-            bufferDeviceAdressFeature.bufferDeviceAddress) break;
+            bufferDeviceAdressFeature.bufferDeviceAddress &&
+            accelerationFeature.accelerationStructure &&
+            rayTracingFeature.rayTracingPipeline &&
+            rayQueryFeature.rayQuery &
+            queryResetFeature.hostQueryReset) {
+            supportedDevice = true;
+        };
+    }
+    if ( !supportedDevice ) {
+        RUNTIME_ERROR("no supported device");
     }
     m_physicalDevice = physicalDevice;
     m_surfaceFormats = surfaceFormats;
@@ -212,9 +229,25 @@ void App::createLogicalDevice() {
         queueInfos.push_back(queueInfo);
     }
 
+    VkPhysicalDeviceHostQueryResetFeatures queryResetFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES };
+    queryResetFeature.hostQueryReset = VK_TRUE;
+
+    VkPhysicalDeviceRayQueryFeaturesKHR rayQueryFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR };
+    rayQueryFeature.pNext = &queryResetFeature;
+    rayQueryFeature.rayQuery = VK_TRUE;
+
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
+    rayTracingFeature.pNext = &rayQueryFeature;
+    rayTracingFeature.rayTracingPipeline = VK_TRUE;
+
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
+    accelerationFeature.pNext = &rayTracingFeature;
+    accelerationFeature.accelerationStructure = VK_TRUE;
+
     VkPhysicalDeviceBufferDeviceAddressFeatures bufferDeviceAdressFeature{};
     bufferDeviceAdressFeature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
     bufferDeviceAdressFeature.bufferDeviceAddress = VK_TRUE;
+    bufferDeviceAdressFeature.pNext = &accelerationFeature;
 
     VkPhysicalDeviceFeatures2 deviceFeatures2{};
     deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;

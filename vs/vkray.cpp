@@ -69,8 +69,12 @@ void App::createBottomLevelAS() {
     createInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
     createInfo.size = sizeInfo.accelerationStructureSize;
 
+    Buffer* accelStructureBuffer = new Buffer( m_device, m_physicalDevice );
+    accelStructureBuffer->setup( createInfo.size, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT );
+    accelStructureBuffer->create();
+    createInfo.buffer = accelStructureBuffer->getBuffer();
 
-    VkAccelerationStructureKHR accelStructure{};
+    VkAccelerationStructureKHR accelStructure;
 
     PFN_vkCreateAccelerationStructureKHR CreateAccelerationStructureKHR = 
         (PFN_vkCreateAccelerationStructureKHR) vkGetInstanceProcAddr( m_instance, "vkCreateAccelerationStructureKHR" );
@@ -78,14 +82,12 @@ void App::createBottomLevelAS() {
 
     //vkCreateAccelerationStructureKHR( m_device, &createInfo, nullptr, &accelStructure );
 
-    Buffer* accelStructureBuffer = new Buffer( m_device, m_physicalDevice );
-    accelStructureBuffer->setup( createInfo.size, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT );
-    accelStructureBuffer->create();
     buildInfo.dstAccelerationStructure = accelStructure;
 
 
     Buffer* scratchBuffer = new Buffer( m_device, m_physicalDevice );
     scratchBuffer->setup( sizeInfo.buildScratchSize, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT );
+    scratchBuffer->create();
 
     VkBufferDeviceAddressInfo bufferInfo{ VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO };
     bufferInfo.buffer = scratchBuffer->m_buffer;
