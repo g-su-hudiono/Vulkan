@@ -97,6 +97,9 @@ private:
     void createGraphicsPipeline();
 
     // vkray.cpp
+    VkAccelerationStructureKHR m_blAccelStructure;
+    VkAccelerationStructureKHR m_alAccelStructure;
+
     void initRayTracing();
     void createBottomLevelAS();
     void createTopLevelAS();
