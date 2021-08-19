@@ -133,29 +133,27 @@ void App::createTopLevelAS() {
         ( PFN_vkGetAccelerationStructureDeviceAddressKHR )vkGetInstanceProcAddr( m_instance, "vkGetAccelerationStructureDeviceAddressKHR" );
     VkDeviceAddress blasAddress = GetAccelerationStructureDeviceAddress( m_device, &addressInfo );
 
-    glm::mat4 m_model = m_pCube->getMatrix();
-    memcpy(&geometryInstance.transform, &m_model, sizeof( m_model ));
+    const VkTransformMatrixKHR transform = {
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+    };
+    geometryInstance.transform                              = transform;
     geometryInstance.instanceCustomIndex                    = 0;
     geometryInstance.mask                                   = 0xFF;
     geometryInstance.instanceShaderBindingTableRecordOffset = 0;
     geometryInstance.flags                                  = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
     geometryInstance.accelerationStructureReference         = blasAddress;
 
-    VkDeviceSize instanceDescsSizeInBytes = sizeof(VkAccelerationStructureInstanceKHR);
-    VkDeviceSize instanceSize = sizeof( geometryInstance );
-
-    Buffer* tempBuffer = new Buffer( m_device, m_physicalDevice );
-    tempBuffer->setup( instanceSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT );
-    tempBuffer->fillBuffer( &geometryInstance, sizeof( geometryInstance ) );
+    VkDeviceSize instanceSize = sizeof( VkAccelerationStructureInstanceKHR );
 
     Buffer* instanceBuffer = new Buffer( m_device, m_physicalDevice );
-    instanceBuffer->setup( instanceSize, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT );
+    instanceBuffer->setup( instanceSize, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR );
     instanceBuffer->create();
+    instanceBuffer->fillBuffer( &geometryInstance, instanceSize );
 
     VkCommandBuffer cmdBuffer = beginSingleTimeCommands();
-    VkBufferCopy copyRegion = { 0, 0, instanceSize };
-    vkCmdCopyBuffer( cmdBuffer, tempBuffer->getBuffer(), instanceBuffer->getBuffer(), 1, &copyRegion );
-
+    
     VkBufferDeviceAddressInfo bufferInfo{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
     bufferInfo.buffer               = instanceBuffer->getBuffer();
     VkDeviceAddress instanceAddress = vkGetBufferDeviceAddress(m_device, &bufferInfo);
@@ -206,6 +204,7 @@ void App::createTopLevelAS() {
         (PFN_vkCreateAccelerationStructureKHR) vkGetInstanceProcAddr( m_instance, "vkCreateAccelerationStructureKHR" );
     CreateAccelerationStructureKHR( m_device, &createInfo, nullptr, &accelStructure );
 
+    buildInfo.srcAccelerationStructure = VK_NULL_HANDLE;
     buildInfo.dstAccelerationStructure = accelStructure;
 
 
@@ -228,7 +227,7 @@ void App::createTopLevelAS() {
     CmdBuildAccelerationStructuresKHR( cmdBuffer, 1, &buildInfo, &accelRange );
 
     endSingleTimeCommands( cmdBuffer );
-    m_alAccelStructure = accelStructure;
+    m_tlAccelStructure = accelStructure;
 }
 
 void App::createRtDescriptorSet() {
