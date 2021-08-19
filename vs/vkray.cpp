@@ -231,6 +231,74 @@ void App::createTopLevelAS() {
 }
 
 void App::createRtDescriptorSet() {
+    VkDescriptorSetLayoutBinding layoutBinding0{};
+    layoutBinding0.binding         = 0;
+    layoutBinding0.descriptorCount = 1;
+    layoutBinding0.descriptorType  = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+    layoutBinding0.stageFlags      = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+    layoutBinding0.pImmutableSamplers = nullptr;
+    
+    VkDescriptorSetLayoutBinding layoutBinding1{};
+    layoutBinding1.binding         = 1;
+    layoutBinding1.descriptorCount = 1;
+    layoutBinding1.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    layoutBinding1.stageFlags      = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+    layoutBinding1.pImmutableSamplers = nullptr;
+    
+    std::vector<VkDescriptorSetLayoutBinding> layoutBindings = { layoutBinding0, layoutBinding1};
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 2;
+    layoutInfo.pBindings    = layoutBindings.data();
+    
+    VkResult result = vkCreateDescriptorSetLayout(m_device, &layoutInfo, nullptr, &m_rtDescSetLayout);
+    CHECK_VKRESULT(result, "failed to create descriptor set layout!");
+    
+    VkDescriptorPoolSize poolSize{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 };
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.maxSets       = 1;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes    = &poolSize;
+    
+    result = vkCreateDescriptorPool(m_device, &poolInfo, nullptr, &m_rtDescPool);
+    CHECK_VKRESULT(result, "failed to create descriptor pool!");
+
+    VkDescriptorSetAllocateInfo allocateInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+    allocateInfo.descriptorPool     = m_rtDescPool;
+    allocateInfo.descriptorSetCount = 1;
+    allocateInfo.pSetLayouts        = &m_rtDescSetLayout;
+    vkAllocateDescriptorSets(m_device, &allocateInfo, &m_rtDescSet );
+
+
+    VkAccelerationStructureKHR tlas = m_tlAccelStructure;
+    VkWriteDescriptorSetAccelerationStructureKHR descASInfo{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
+    descASInfo.accelerationStructureCount = 1;
+    descASInfo.pAccelerationStructures    = &tlas;
+    VkDescriptorImageInfo imageInfo{{}, m_offscreenImage->getImageView(), VK_IMAGE_LAYOUT_GENERAL};
+    
+    VkWriteDescriptorSet writeSet0{};
+    writeSet0.sType  = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writeSet0.dstBinding      = 0;
+    writeSet0.descriptorCount = 1;
+    writeSet0.descriptorType  = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+    writeSet0.dstArrayElement = 0;
+    writeSet0.dstSet          = m_rtDescSet;
+    writeSet0.pNext           = &descASInfo;
+    
+    VkWriteDescriptorSet writeSet1{};
+    writeSet1.sType  = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writeSet1.dstBinding      = 1;
+    writeSet1.descriptorCount = 1;
+    writeSet1.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    writeSet1.dstArrayElement = 0;
+    writeSet1.dstSet          = m_rtDescSet;
+    writeSet1.pNext           = &imageInfo;
+
+    std::vector<VkWriteDescriptorSet> writes = { writeSet0, writeSet1 };
+    vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+
 }
 
 void App::createRtPipeline() {
