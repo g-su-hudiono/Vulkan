@@ -364,5 +364,30 @@ void App::createRtPipeline() {
 }
 
 void App::createRtShaderBindingTable() {
+    auto     groupCount       = static_cast< uint32_t >( m_rtShaderGroups.size() );
+    uint32_t groupHandleSize  = m_rtProperties.shaderGroupHandleSize;
+    uint32_t groupSizeAligned = m_rtProperties.shaderGroupBaseAlignment;
+    uint32_t sbtSize          = groupCount * groupSizeAligned;
+
+    PFN_vkGetRayTracingShaderGroupHandlesKHR GetRayTracingShaderGroupHandlesKHR =
+        ( PFN_vkGetRayTracingShaderGroupHandlesKHR )vkGetInstanceProcAddr( m_instance, "vkGetRayTracingShaderGroupHandlesKHR" );
+
+    std::vector<uint8_t> shaderHandleStorage( sbtSize );
+    VkResult result = GetRayTracingShaderGroupHandlesKHR( m_device, m_rtPipeline, 0, groupCount, sbtSize, shaderHandleStorage.data() );
+    assert( result == VK_SUCCESS );
+
+    m_rtSBTBuffer = new Buffer( m_device, m_physicalDevice );
+    m_rtSBTBuffer->setup( sbtSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | 
+                                   VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | 
+                                   VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR );
+
+    void* ptr = m_rtSBTBuffer->mapMemory( sbtSize );
+    auto* pData = reinterpret_cast< uint8_t* >( ptr );
+    for ( uint32_t i = 0; i < groupCount; i++ )
+    {
+        memcpy( pData, shaderHandleStorage.data() + i * groupHandleSize, groupHandleSize ); 
+        pData += groupSizeAligned;
+    }
+    m_rtSBTBuffer->unmapMemory();
 
 }
