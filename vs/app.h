@@ -97,12 +97,28 @@ private:
     void createGraphicsPipeline();
 
     // vkray.cpp
+    VkPhysicalDeviceRayTracingPipelinePropertiesKHR m_rtProperties;
     VkAccelerationStructureKHR m_blAccelStructure;
     VkAccelerationStructureKHR m_tlAccelStructure;
 
     VkDescriptorPool      m_rtDescPool      = VK_NULL_HANDLE;
     VkDescriptorSetLayout m_rtDescSetLayout = VK_NULL_HANDLE;
     VkDescriptorSet       m_rtDescSet       = VK_NULL_HANDLE;
+
+    std::vector<VkRayTracingShaderGroupCreateInfoKHR> m_rtShaderGroups;
+
+    VkPipeline       m_rtPipeline;
+    VkPipelineLayout m_rtPipelineLayout;
+
+    Buffer* m_rtSBTBuffer;
+
+    struct RtPushConstant
+    {
+        glm::vec4 clearColor;
+        glm::vec3 lightPosition;
+        float     lightIntensity{ 100.0f };
+        int       lightType{ 0 };
+    } m_rtPushConstants;
 
     void initRayTracing();
     void createBottomLevelAS();

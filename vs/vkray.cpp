@@ -2,9 +2,9 @@
 
 
 void App::initRayTracing() {
-    VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProperties{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
+    m_rtProperties = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
     VkPhysicalDeviceProperties2 properties2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
-    properties2.pNext = &rtProperties;
+    properties2.pNext = &m_rtProperties;
     vkGetPhysicalDeviceProperties2( m_physicalDevice, &properties2 );
 }
 
@@ -294,7 +294,7 @@ void App::createRtDescriptorSet() {
     writeSet1.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     writeSet1.dstArrayElement = 0;
     writeSet1.dstSet          = m_rtDescSet;
-    writeSet1.pNext           = &imageInfo;
+    writeSet1.pImageInfo      = &imageInfo;
 
     std::vector<VkWriteDescriptorSet> writes = { writeSet0, writeSet1 };
     vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
@@ -302,7 +302,65 @@ void App::createRtDescriptorSet() {
 }
 
 void App::createRtPipeline() {
+    Shader* rayGenShader  = new Shader( m_device, "../shaders/spv/raytrace.rgen.spv", VK_SHADER_STAGE_RAYGEN_BIT_KHR );
+    Shader* rayMissShader = new Shader( m_device, "../shaders/spv/raytrace.rmiss.spv", VK_SHADER_STAGE_MISS_BIT_KHR );
+    Shader* rayShadowShader = new Shader( m_device, "../shaders/spv/raytraceShadow.rmiss.spv", VK_SHADER_STAGE_MISS_BIT_KHR );
+    Shader* rayHitShader  = new Shader( m_device, "../shaders/spv/raytrace.rchit.spv", VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR );
 
+    std::array<VkPipelineShaderStageCreateInfo, 3> stages{};
+    stages[0] = rayGenShader->getShaderStageInfo();
+    stages[1] = rayMissShader->getShaderStageInfo();
+    stages[2] = rayHitShader->getShaderStageInfo();
+
+    VkRayTracingShaderGroupCreateInfoKHR group{ VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR };
+    group.anyHitShader       = VK_SHADER_UNUSED_KHR;
+    group.closestHitShader   = VK_SHADER_UNUSED_KHR;
+    group.generalShader      = VK_SHADER_UNUSED_KHR;
+    group.intersectionShader = VK_SHADER_UNUSED_KHR;
+
+    group.type          = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+    group.generalShader = 0;
+    m_rtShaderGroups.push_back( group );
+
+    group.type          = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+    group.generalShader = 1;
+    m_rtShaderGroups.push_back( group );
+
+    group.type          = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+    group.generalShader = 2;
+    m_rtShaderGroups.push_back( group );
+
+    group.type          = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+    group.generalShader = VK_SHADER_UNUSED_KHR;
+    group.closestHitShader = 3;
+    m_rtShaderGroups.push_back( group );
+
+    VkPushConstantRange pushConstant{ VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR,
+                                     0, sizeof( RtPushConstant ) };
+
+    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+    pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+    pipelineLayoutCreateInfo.pPushConstantRanges    = &pushConstant;
+
+    std::vector<VkDescriptorSetLayout> rtDescSetLayouts = { m_rtDescSetLayout, m_descSetLayout };
+    pipelineLayoutCreateInfo.setLayoutCount = static_cast< uint32_t >( rtDescSetLayouts.size() );
+    pipelineLayoutCreateInfo.pSetLayouts    = rtDescSetLayouts.data();
+
+    vkCreatePipelineLayout( m_device, &pipelineLayoutCreateInfo, nullptr, &m_rtPipelineLayout );
+
+    VkRayTracingPipelineCreateInfoKHR rayPipelineInfo{ VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR };
+    rayPipelineInfo.stageCount = static_cast< uint32_t >( stages.size() ); 
+    rayPipelineInfo.pStages    = stages.data();
+    rayPipelineInfo.groupCount = static_cast< uint32_t >( m_rtShaderGroups.size() );
+    rayPipelineInfo.pGroups    = m_rtShaderGroups.data();
+    rayPipelineInfo.layout     = m_rtPipelineLayout;
+    rayPipelineInfo.maxPipelineRayRecursionDepth = 2;
+
+    // vkCreateRayTracingPipelinesKHR( m_device, {}, {}, 1, & rayPipelineInfo, nullptr, & m_rtPipeline );
+
+    PFN_vkCreateRayTracingPipelinesKHR CreateRayTracingPipelinesKHR =
+        ( PFN_vkCreateRayTracingPipelinesKHR )vkGetInstanceProcAddr( m_instance, "vkCreateRayTracingPipelinesKHR" );
+    CreateRayTracingPipelinesKHR( m_device, {}, {}, 1, &rayPipelineInfo, nullptr, &m_rtPipeline );
 }
 
 void App::createRtShaderBindingTable() {
