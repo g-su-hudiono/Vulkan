@@ -137,6 +137,15 @@ VkImage         Image::getImage      () { return m_image;       }
 VkImageView     Image::getImageView  () { return m_imageView;   }
 VkDeviceMemory  Image::getImageMemory() { return m_imageMemory; }
 
+VkDescriptorImageInfo Image::getDescriptor()
+{
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView   = m_imageView;
+    imageInfo.sampler     = m_sampler;
+    return imageInfo;
+}
+
 
 // Private ==================================================
 

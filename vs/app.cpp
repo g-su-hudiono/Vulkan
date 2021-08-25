@@ -83,9 +83,14 @@ void App::initVulkan() {
     //createRenderPass();
 
     //createFrameData();
+    //createFrameData();
 
     //createDescriptor();
     //createPipeline();
+
+    m_camera = new Camera();
+    m_mvp.view = m_camera->getViewMatrix();
+    m_mvp.proj = m_camera->getProjection( ( float )WIDTH / HEIGHT );
 
     initRayTracing();
     createBottomLevelAS();
@@ -94,10 +99,11 @@ void App::initVulkan() {
     createRtPipeline();
     createRtShaderBindingTable();
     
+    createPostDescriptor();
+    createPostPipeline();
+    updatePostDescriptorSet();
 
-    m_camera = new Camera();
-    m_mvp.view = m_camera->getViewMatrix();
-    m_mvp.proj = m_camera->getProjection( ( float )WIDTH / HEIGHT );
+
 }
 
 void App::createShader() {
@@ -115,6 +121,11 @@ void App::createGeometry() {
     m_pFloor->createPlane();
     m_pFloor->cmdCreateVertexBuffer();
     m_pFloor->cmdCreateIndexBuffer();
+
+    m_pQuad = new Mesh( m_device, m_physicalDevice );
+    m_pQuad->createQuad();
+    m_pQuad->cmdCreateVertexBuffer();
+    m_pQuad->cmdCreateIndexBuffer();
 }
 
 void App::createSwapchain() {
@@ -308,15 +319,16 @@ void App::createDescriptor() {
     CHECK_VKRESULT(result, "failed to allocate descriptor set!");
 
     VkDescriptorBufferInfo bufferInfo = m_uniformBuffer->getBufferInfo();
-    m_writeDescSet.sType  = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    m_writeDescSet.dstBinding      = 0;
-    m_writeDescSet.descriptorCount = 1;
-    m_writeDescSet.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    m_writeDescSet.dstArrayElement = 0;
-    m_writeDescSet.dstSet          = m_descSet;
-    m_writeDescSet.pBufferInfo     = &bufferInfo;
+    VkWriteDescriptorSet writeDescSet{};
+    writeDescSet.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writeDescSet.dstBinding      = 0;
+    writeDescSet.descriptorCount = 1;
+    writeDescSet.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writeDescSet.dstArrayElement = 0;
+    writeDescSet.dstSet          = m_descSet;
+    writeDescSet.pBufferInfo     = &bufferInfo;
 
-    vkUpdateDescriptorSets( m_device, 1, &m_writeDescSet, 0, nullptr );
+    vkUpdateDescriptorSets( m_device, 1, &writeDescSet, 0, nullptr );
 }
 
 void App::createPipeline() {
@@ -342,17 +354,13 @@ void App::createPipeline() {
     VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo{};
     inputAssemblyInfo.sType    = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     inputAssemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    inputAssemblyInfo.primitiveRestartEnable = VK_FALSE;
     
     VkPipelineRasterizationStateCreateInfo rasterizationInfo{};
     rasterizationInfo.sType       = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterizationInfo.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizationInfo.cullMode    = VK_CULL_MODE_NONE;
     rasterizationInfo.frontFace   = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    rasterizationInfo.rasterizerDiscardEnable = VK_FALSE;
-    rasterizationInfo.depthClampEnable        = VK_FALSE;
-    rasterizationInfo.depthBiasEnable         = VK_FALSE;
-    rasterizationInfo.lineWidth               = 1.0f;
+    rasterizationInfo.lineWidth   = 1.0f;
     
     VkPipelineMultisampleStateCreateInfo multisampleInfo{};
     multisampleInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -363,11 +371,9 @@ void App::createPipeline() {
     depthStencilInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     depthStencilInfo.depthTestEnable        = VK_TRUE;
     depthStencilInfo.depthWriteEnable       = VK_TRUE;
-    depthStencilInfo.depthBoundsTestEnable  = VK_FALSE;
     depthStencilInfo.depthCompareOp         = VK_COMPARE_OP_LESS;
     depthStencilInfo.minDepthBounds         = 0.0f;
     depthStencilInfo.maxDepthBounds         = 1.0f;
-    depthStencilInfo.stencilTestEnable      = VK_FALSE;
 
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
     colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -375,8 +381,6 @@ void App::createPipeline() {
 
     VkPipelineColorBlendStateCreateInfo colorBlendInfo{};
     colorBlendInfo.sType             = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlendInfo.logicOpEnable     = VK_FALSE;
-    colorBlendInfo.logicOp           = VK_LOGIC_OP_COPY;
     colorBlendInfo.attachmentCount   = 1;
     colorBlendInfo.pAttachments      = &colorBlendAttachment;
     colorBlendInfo.blendConstants[0] = 0.0f;
@@ -416,6 +420,140 @@ void App::createPipeline() {
     
     result = vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline);
     CHECK_VKRESULT(result, "failed to create graphics pipeline!");
+}
+
+void App::createPostDescriptor() {
+    VkDescriptorSetLayoutBinding layoutBinding{};
+    layoutBinding.binding         = 0;
+    layoutBinding.descriptorCount = 1;
+    layoutBinding.descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    layoutBinding.stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
+    layoutBinding.pImmutableSamplers = nullptr;
+    
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 1;
+    layoutInfo.pBindings    = &layoutBinding;
+    
+    VkResult result = vkCreateDescriptorSetLayout(m_device, &layoutInfo, nullptr, &m_postDescSetLayout );
+    CHECK_VKRESULT(result, "failed to create descriptor set layout!");
+    
+    VkDescriptorPoolSize poolSize{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 };
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.maxSets       = 1;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes    = &poolSize;
+
+    result = vkCreateDescriptorPool(m_device, &poolInfo, nullptr, &m_postDescPool );
+    CHECK_VKRESULT(result, "failed to create descriptor pool!");
+    
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool     = m_postDescPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts        = &m_postDescSetLayout;
+    
+    result = vkAllocateDescriptorSets(m_device, &allocInfo, &m_postDescSet );
+    CHECK_VKRESULT(result, "failed to allocate descriptor set!");
+}
+
+void App::createPostPipeline() {
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width  = WIDTH;
+    viewport.height = HEIGHT;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = m_extent;
+
+    VkPipelineViewportStateCreateInfo viewportInfo{};
+    viewportInfo.sType         = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportInfo.viewportCount = 1;
+    viewportInfo.scissorCount  = 1;
+    viewportInfo.pViewports    = &viewport;
+    viewportInfo.pScissors     = &scissor;
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo{};
+    inputAssemblyInfo.sType    = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    
+    VkPipelineRasterizationStateCreateInfo rasterizationInfo{};
+    rasterizationInfo.sType       = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizationInfo.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterizationInfo.cullMode    = VK_CULL_MODE_NONE;
+    rasterizationInfo.frontFace   = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizationInfo.lineWidth   = 1.0f;
+    
+    VkPipelineMultisampleStateCreateInfo multisampleInfo{};
+    multisampleInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampleInfo.rasterizationSamples  = VK_SAMPLE_COUNT_1_BIT;
+    
+    VkPipelineDepthStencilStateCreateInfo depthStencilInfo{};
+    depthStencilInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencilInfo.depthTestEnable        = VK_TRUE;
+    depthStencilInfo.depthWriteEnable       = VK_TRUE;
+    depthStencilInfo.depthCompareOp         = VK_COMPARE_OP_LESS_OR_EQUAL;
+
+    VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    
+    VkPipelineColorBlendStateCreateInfo colorBlendInfo{};
+    colorBlendInfo.sType             = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlendInfo.attachmentCount   = 1;
+    colorBlendInfo.pAttachments      = &colorBlendAttachment;
+
+    VkPushConstantRange pushConstantRanges = {VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float)};
+    VkPipelineLayoutCreateInfo createInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    createInfo.setLayoutCount         = 1;
+    createInfo.pSetLayouts            = &m_postDescSetLayout;
+    createInfo.pushConstantRangeCount = 1;
+    createInfo.pPushConstantRanges    = &pushConstantRanges;
+    vkCreatePipelineLayout(m_device, &createInfo, nullptr, &m_postPipelineLayout);
+
+    Shader* vertShader = new Shader( m_device, "../shaders/spv/passthrough.vert.spv", VK_SHADER_STAGE_VERTEX_BIT );
+    Shader* fragShader = new Shader( m_device, "../shaders/spv/post.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT );
+    std::vector<VkPipelineShaderStageCreateInfo> shaderStages = {
+        vertShader->getShaderStageInfo(),
+        fragShader->getShaderStageInfo(),
+    };
+
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo{ VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
+
+    VkGraphicsPipelineCreateInfo pipelineInfo{};
+    pipelineInfo.sType      = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.layout     = m_postPipelineLayout;
+    pipelineInfo.renderPass = m_renderPass;
+    pipelineInfo.subpass    = 0;
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages             = shaderStages.data();
+    pipelineInfo.pVertexInputState   = &vertexInputInfo;
+    pipelineInfo.pViewportState      = &viewportInfo;
+    pipelineInfo.pInputAssemblyState = &inputAssemblyInfo;
+    pipelineInfo.pRasterizationState = &rasterizationInfo;
+    pipelineInfo.pMultisampleState   = &multisampleInfo;
+    pipelineInfo.pColorBlendState    = &colorBlendInfo;
+    pipelineInfo.pDepthStencilState  = &depthStencilInfo;
+    
+    VkResult result = vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_postPipeline );
+    CHECK_VKRESULT(result, "failed to create graphics pipeline!");
+}
+
+void App::updatePostDescriptorSet() {
+    VkDescriptorImageInfo imageInfo = m_offscreenImage->getDescriptor();
+    VkWriteDescriptorSet writeDescSet{};
+    writeDescSet.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writeDescSet.dstBinding      = 0;
+    writeDescSet.descriptorCount = 1;
+    writeDescSet.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writeDescSet.dstArrayElement = 0;
+    writeDescSet.dstSet          = m_postDescSet;
+    writeDescSet.pImageInfo      = &imageInfo;
+    vkUpdateDescriptorSets( m_device, 1, &writeDescSet, 0, nullptr );
 }
 
 void App::process() {

@@ -147,10 +147,6 @@ void App::createGraphicsPipeline() {
     colorBlendInfo.logicOp           = VK_LOGIC_OP_COPY;
     colorBlendInfo.attachmentCount   = 1;
     colorBlendInfo.pAttachments      = &colorBlendAttachment;
-    colorBlendInfo.blendConstants[0] = 0.0f;
-    colorBlendInfo.blendConstants[1] = 0.0f;
-    colorBlendInfo.blendConstants[2] = 0.0f;
-    colorBlendInfo.blendConstants[3] = 0.0f;
     
     std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
     shaderStages.push_back(m_vertexShader->getShaderStageInfo());

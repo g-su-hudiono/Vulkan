@@ -47,6 +47,7 @@ private:
 
     Mesh* m_pCube;
     Mesh* m_pFloor;
+    Mesh* m_pQuad;
     void createGeometry();
     
     VkExtent2D m_extent;
@@ -72,7 +73,6 @@ private:
     VkDescriptorSetLayout        m_descSetLayout = VK_NULL_HANDLE;
     VkDescriptorSet              m_descSet;
     VkDescriptorSetLayoutBinding m_descLayoutBinding;
-    VkWriteDescriptorSet         m_writeDescSet;
     void createDescriptor();
 
     VkPipeline m_pipeline;
@@ -83,6 +83,18 @@ private:
     uint32_t m_currentFrame = 0;
     Camera* m_camera;
     void process();
+    
+    VkDescriptorPool             m_postDescPool      = VK_NULL_HANDLE;
+    VkDescriptorSetLayout        m_postDescSetLayout = VK_NULL_HANDLE;
+    VkDescriptorSet              m_postDescSet;
+    VkDescriptorSetLayoutBinding m_postDescLayoutBinding;
+
+    VkPipeline       m_postPipeline;
+    VkPipelineLayout m_postPipelineLayout;
+
+    void createPostDescriptor();
+    void createPostPipeline();
+    void updatePostDescriptorSet();
 
     // offscreen.cpp
     VkRenderPass m_offscreenRenderPass = VK_NULL_HANDLE;

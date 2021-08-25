@@ -307,10 +307,11 @@ void App::createRtPipeline() {
     Shader* rayShadowShader = new Shader( m_device, "../shaders/spv/raytraceShadow.rmiss.spv", VK_SHADER_STAGE_MISS_BIT_KHR );
     Shader* rayHitShader  = new Shader( m_device, "../shaders/spv/raytrace.rchit.spv", VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR );
 
-    std::array<VkPipelineShaderStageCreateInfo, 3> stages{};
+    std::array<VkPipelineShaderStageCreateInfo, 4> stages{};
     stages[0] = rayGenShader->getShaderStageInfo();
     stages[1] = rayMissShader->getShaderStageInfo();
-    stages[2] = rayHitShader->getShaderStageInfo();
+    stages[2] = rayShadowShader->getShaderStageInfo();
+    stages[3] = rayHitShader->getShaderStageInfo();
 
     VkRayTracingShaderGroupCreateInfoKHR group{ VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR };
     group.anyHitShader       = VK_SHADER_UNUSED_KHR;

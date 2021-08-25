@@ -25,6 +25,7 @@ public:
     VkImage          getImage      ();
     VkImageView      getImageView  ();
     VkDeviceMemory   getImageMemory();
+    VkDescriptorImageInfo getDescriptor();
     
 private:
         

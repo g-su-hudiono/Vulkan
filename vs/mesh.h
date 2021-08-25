@@ -11,6 +11,7 @@ public:
     
     void cleanup();
     void createPlane();
+    void createQuad();
     void createCube();
     void cmdCreateVertexBuffer();
     void cmdCreateIndexBuffer ();
