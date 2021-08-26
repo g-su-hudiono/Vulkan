@@ -40,10 +40,6 @@ private:
     
     void initWindow();
     void initVulkan();
-    
-    Shader* m_vertexShader;
-    Shader* m_pixelShader;
-    void createShader();
 
     Mesh* m_pCube;
     Mesh* m_pFloor;
@@ -59,11 +55,11 @@ private:
     void createRenderPass();
 
     uint32_t m_totalFrame = 0;
-    Image* m_depthImage;
+    Image*   m_depthImage;
+    Buffer*  m_uniformBuffer;
     std::vector<VkCommandBuffer> m_cmdBuffers;
     std::vector<Image*>        m_fbImages;
     std::vector<VkFramebuffer> m_fb;
-    std::vector<Buffer*>       m_uniformBuffers;
     std::vector<VkSemaphore>   m_imageSemaphores;
     std::vector<VkSemaphore>   m_renderSemaphores;
     std::vector<VkFence>       m_commandFences;
@@ -73,11 +69,11 @@ private:
     VkDescriptorSetLayout        m_descSetLayout = VK_NULL_HANDLE;
     VkDescriptorSet              m_descSet;
     VkDescriptorSetLayoutBinding m_descLayoutBinding;
-    void createDescriptor();
+    void createDescriptorSet();
+    void updateDescriptorSet();
 
     VkPipeline m_pipeline;
     VkPipelineLayout m_pipelineLayout;
-    void createPipeline();
 
     UniformBuffer m_mvp{};
     uint32_t m_currentFrame = 0;
@@ -102,7 +98,7 @@ private:
 
     Image*  m_offscreenImage;
     Image*  m_offscreenDepth;
-    Buffer* m_uniformBuffer;
+    Buffer* m_offscreenUniformBuffer;
     VkFramebuffer m_offscreenFramebuffer;
     void createOffscreenFramedata();
 

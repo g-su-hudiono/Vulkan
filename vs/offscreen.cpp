@@ -35,8 +35,7 @@ void App::createOffscreenRenderPass() {
     depthAttachment.stencilStoreOp  = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depthAttachment.initialLayout   = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     depthAttachment.finalLayout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    
-    
+   
     std::array<VkAttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
     
     VkSubpassDependency dependency{};
@@ -81,10 +80,6 @@ void App::createOffscreenFramedata() {
 
     VkResult result = vkCreateFramebuffer( m_device, &framebufferInfo, nullptr, &m_offscreenFramebuffer );
     CHECK_VKRESULT( result, "failed to create framebuffer!" );
-
-    m_uniformBuffer = new Buffer( m_device, m_physicalDevice );
-    m_uniformBuffer->setup( sizeof( UniformBuffer ), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT );
-    m_uniformBuffer->create();
 }
 
 void App::createGraphicsPipeline() {
@@ -147,10 +142,12 @@ void App::createGraphicsPipeline() {
     colorBlendInfo.logicOp           = VK_LOGIC_OP_COPY;
     colorBlendInfo.attachmentCount   = 1;
     colorBlendInfo.pAttachments      = &colorBlendAttachment;
-    
+
+    Shader* vertexShader = new Shader( m_device, "../shaders/spv/vert.spv", VK_SHADER_STAGE_VERTEX_BIT );
+    Shader* pixelShader = new Shader( m_device, "../shaders/spv/frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT );
     std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
-    shaderStages.push_back(m_vertexShader->getShaderStageInfo());
-    shaderStages.push_back(m_pixelShader->getShaderStageInfo());
+    shaderStages.push_back(vertexShader->getShaderStageInfo());
+    shaderStages.push_back(pixelShader->getShaderStageInfo());
     
     VkPipelineVertexInputStateCreateInfo* vertexInputInfo = m_pCube->createVertexInputInfo();
     
