@@ -74,13 +74,11 @@ void App::initVulkan() {
     createOffscreenRenderPass();
     createOffscreenFramedata();
 
-    createDescriptorSet();
+    createOffscreenDescriptorSet();
     createOffscreenPipeline();
-    updateDescriptorSet();
+    updateOffscreenDescriptorSet();
 
     m_camera = new Camera();
-    m_mvp.view = m_camera->getViewMatrix();
-    m_mvp.proj = m_camera->getProjection( ( float )WIDTH / HEIGHT );
 
     //initRayTracing();
     //createBottomLevelAS();
@@ -257,65 +255,6 @@ void App::createFrameData() {
     }
 }
 
-void App::createDescriptorSet() {
-    VkDescriptorSetLayoutBinding layoutBinding0{};
-    layoutBinding0.binding         = 0;
-    layoutBinding0.descriptorCount = 1;
-    layoutBinding0.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    layoutBinding0.stageFlags      = VK_SHADER_STAGE_VERTEX_BIT;
-    layoutBinding0.pImmutableSamplers = nullptr;
-
-    //VkDescriptorSetLayoutBinding layoutBinding1{};
-    //layoutBinding1.binding         = 1;
-    //layoutBinding1.descriptorCount = 1;
-    //layoutBinding1.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    //layoutBinding1.stageFlags      = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-    //layoutBinding1.pImmutableSamplers = nullptr;
-
-    std::vector<VkDescriptorSetLayoutBinding> layoutBindings = { layoutBinding0 };
-
-    VkDescriptorSetLayoutCreateInfo layoutInfo{};
-    layoutInfo.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = UINT32(layoutBindings.size());
-    layoutInfo.pBindings    = layoutBindings.data();
-
-    VkResult result = vkCreateDescriptorSetLayout( m_device, &layoutInfo, nullptr, &m_descSetLayout );
-    CHECK_VKRESULT( result, "failed to create descriptor set layout!" );
-
-    VkDescriptorPoolSize poolSize{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 };
-    VkDescriptorPoolCreateInfo poolInfo{};
-    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.maxSets = 1;
-    poolInfo.poolSizeCount = 1;
-    poolInfo.pPoolSizes = &poolSize;
-
-    result = vkCreateDescriptorPool( m_device, &poolInfo, nullptr, &m_descPool );
-    CHECK_VKRESULT( result, "failed to create descriptor pool!" );
-
-    VkDescriptorSetAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = m_descPool;
-    allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts = &m_descSetLayout;
-
-    result = vkAllocateDescriptorSets( m_device, &allocInfo, &m_descSet );
-    CHECK_VKRESULT( result, "failed to allocate descriptor set!" );
-}
-
-void App::updateDescriptorSet() {
-    VkDescriptorBufferInfo bufferInfo = m_uniformBuffer->getBufferInfo();
-    VkWriteDescriptorSet writeDescSet{};
-    writeDescSet.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writeDescSet.dstBinding      = 0;
-    writeDescSet.descriptorCount = 1;
-    writeDescSet.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    writeDescSet.dstArrayElement = 0;
-    writeDescSet.dstSet          = m_descSet;
-    writeDescSet.pBufferInfo     = &bufferInfo;
-
-    vkUpdateDescriptorSets( m_device, 1, &writeDescSet, 0, nullptr );
-}
-
 void App::createPostDescriptor() {
     VkDescriptorSetLayoutBinding layoutBinding{};
     layoutBinding.binding         = 0;
@@ -490,6 +429,11 @@ void App::process() {
                 vkCmdBindPipeline( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_offscreenPipeline );
                 vkCmdBindDescriptorSets( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, 
                                          m_offscreenPipelineLayout, 0, 1, &m_descSet, 0, nullptr );
+                
+                m_mvp.model = m_pCube->getMatrix();
+                m_mvp.view = m_camera->getViewMatrix();
+                m_mvp.proj = m_camera->getProjection( ( float )WIDTH / HEIGHT );
+                m_uniformBuffer->fillBuffer(&m_mvp, sizeof(UniformBuffer));
             
                 VkBuffer vertexBuffers[] = {m_pCube->m_vertexBuffer->m_buffer};
                 VkBuffer indexBuffers    = m_pCube->m_indexBuffer->m_buffer;

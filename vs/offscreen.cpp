@@ -2,13 +2,8 @@
 #include "helper.h"
 
 void App::createOffscreenRenderPass() {
-    VkAttachmentReference depthAttachmentRef{};
-    depthAttachmentRef.attachment = 1;
-    depthAttachmentRef.layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    
-    VkAttachmentReference colorAttachmentRef{};
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    VkAttachmentReference colorAttachmentRef{ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+    VkAttachmentReference depthAttachmentRef{ 1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
 
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
@@ -20,20 +15,14 @@ void App::createOffscreenRenderPass() {
     colorAttachment.format          = VK_FORMAT_R32G32B32A32_SFLOAT;
     colorAttachment.samples         = VK_SAMPLE_COUNT_1_BIT;
     colorAttachment.loadOp          = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp         = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.stencilLoadOp   = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp  = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachment.initialLayout   = VK_IMAGE_LAYOUT_GENERAL;
+    colorAttachment.initialLayout   = VK_IMAGE_LAYOUT_UNDEFINED;
     colorAttachment.finalLayout     = VK_IMAGE_LAYOUT_GENERAL;
     
     VkAttachmentDescription depthAttachment{};
     depthAttachment.format          = ChooseDepthFormat(m_physicalDevice);
     depthAttachment.samples         = VK_SAMPLE_COUNT_1_BIT;
     depthAttachment.loadOp          = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttachment.storeOp         = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.stencilLoadOp   = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depthAttachment.stencilStoreOp  = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.initialLayout   = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depthAttachment.initialLayout   = VK_IMAGE_LAYOUT_UNDEFINED;
     depthAttachment.finalLayout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
    
     std::array<VkAttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
@@ -82,7 +71,66 @@ void App::createOffscreenFramedata() {
     CHECK_VKRESULT( result, "failed to create framebuffer!" );
 }
 
-void App::createGraphicsPipeline() {
+void App::createOffscreenDescriptorSet() {
+    VkDescriptorSetLayoutBinding layoutBinding0{};
+    layoutBinding0.binding         = 0;
+    layoutBinding0.descriptorCount = 1;
+    layoutBinding0.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    layoutBinding0.stageFlags      = VK_SHADER_STAGE_VERTEX_BIT;
+    layoutBinding0.pImmutableSamplers = nullptr;
+
+    //VkDescriptorSetLayoutBinding layoutBinding1{};
+    //layoutBinding1.binding         = 1;
+    //layoutBinding1.descriptorCount = 1;
+    //layoutBinding1.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    //layoutBinding1.stageFlags      = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    //layoutBinding1.pImmutableSamplers = nullptr;
+
+    std::vector<VkDescriptorSetLayoutBinding> layoutBindings = { layoutBinding0 };
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = UINT32(layoutBindings.size());
+    layoutInfo.pBindings    = layoutBindings.data();
+
+    VkResult result = vkCreateDescriptorSetLayout( m_device, &layoutInfo, nullptr, &m_descSetLayout );
+    CHECK_VKRESULT( result, "failed to create descriptor set layout!" );
+
+    VkDescriptorPoolSize poolSize{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 };
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.maxSets = 1;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes = &poolSize;
+
+    result = vkCreateDescriptorPool( m_device, &poolInfo, nullptr, &m_descPool );
+    CHECK_VKRESULT( result, "failed to create descriptor pool!" );
+
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = m_descPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &m_descSetLayout;
+
+    result = vkAllocateDescriptorSets( m_device, &allocInfo, &m_descSet );
+    CHECK_VKRESULT( result, "failed to allocate descriptor set!" );
+}
+
+void App::updateOffscreenDescriptorSet() {
+    VkDescriptorBufferInfo bufferInfo = m_uniformBuffer->getBufferInfo();
+    VkWriteDescriptorSet writeDescSet{};
+    writeDescSet.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writeDescSet.dstBinding      = 0;
+    writeDescSet.descriptorCount = 1;
+    writeDescSet.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writeDescSet.dstArrayElement = 0;
+    writeDescSet.dstSet          = m_descSet;
+    writeDescSet.pBufferInfo     = &bufferInfo;
+
+    vkUpdateDescriptorSets( m_device, 1, &writeDescSet, 0, nullptr );
+}
+
+void App::createOffscreenPipeline() {
     VkViewport viewport{};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
@@ -156,12 +204,12 @@ void App::createGraphicsPipeline() {
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts    = &m_descSetLayout;
     
-    VkResult result = vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &m_pipelineLayout);
+    VkResult result = vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &m_offscreenPipelineLayout);
     CHECK_VKRESULT(result, "failed to create pipeline layout!");
 
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType      = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.layout     = m_pipelineLayout;
+    pipelineInfo.layout     = m_offscreenPipelineLayout;
     pipelineInfo.renderPass = m_offscreenRenderPass;
     pipelineInfo.subpass    = 0;
     pipelineInfo.stageCount = 2;
@@ -175,7 +223,7 @@ void App::createGraphicsPipeline() {
     pipelineInfo.pDepthStencilState  = &depthStencilInfo;
     pipelineInfo.basePipelineHandle  = VK_NULL_HANDLE;
     
-    result = vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline);
+    result = vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_offscreenPipeline);
     CHECK_VKRESULT(result, "failed to create graphics pipeline!");
     
 }

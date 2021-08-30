@@ -69,8 +69,8 @@ private:
     VkDescriptorSetLayout        m_descSetLayout = VK_NULL_HANDLE;
     VkDescriptorSet              m_descSet;
     VkDescriptorSetLayoutBinding m_descLayoutBinding;
-    void createDescriptorSet();
-    void updateDescriptorSet();
+    void createOffscreenDescriptorSet();
+    void updateOffscreenDescriptorSet();
 
 
     UniformBuffer m_mvp{};

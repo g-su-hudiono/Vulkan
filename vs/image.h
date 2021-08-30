@@ -40,7 +40,6 @@ private:
     static VkFormat ChooseDepthFormat( VkPhysicalDevice physicalDevice );
     static VkImageCreateInfo     GetDefaultImageCreateInfo();
     static VkImageViewCreateInfo GetDefaultImageViewCreateInfo();
-    static VkImageMemoryBarrier  GetDefaultImageMemoryBarrier();
 
     
 };
