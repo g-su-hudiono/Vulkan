@@ -100,7 +100,6 @@ void App::cleanupDevice() {
 }
 
 void App::createInstance() {
-    LOG("createInstance");
     VkDebugUtilsMessengerCreateInfoEXT debugInfo{};
     debugInfo.sType  = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
     debugInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
@@ -111,12 +110,6 @@ void App::createInstance() {
                                 VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
     debugInfo.pfnUserCallback = DebugCallback;
 
-    deviceExtensions = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-        VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
-        VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
-        VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME
-    };
     validationLayers = { "VK_LAYER_KHRONOS_validation", "VK_LAYER_LUNARG_monitor" };
 
     VkApplicationInfo appInfo{};
@@ -143,7 +136,7 @@ void App::createInstance() {
     instanceInfo.pNext                   = &debugInfo;
  
     VkResult result = vkCreateInstance( &instanceInfo, nullptr, &m_instance );
-    CHECK_VKRESULT(result, "failed to create vulkan instance!");
+    CHECK_VKRESULT( result, "failed to create vulkan instance!");
     
     result = CreateDebugUtilsMessengerEXT( m_instance, &debugInfo, nullptr, &m_debugMessenger );
     CHECK_VKRESULT( result, "failed to set up debug messenger!" );
@@ -157,20 +150,40 @@ void App::pickPhysicalDevice() {
     vkEnumeratePhysicalDevices( m_instance, &count, nullptr );
     std::vector<VkPhysicalDevice> physicalDevices( count );
     vkEnumeratePhysicalDevices( m_instance, &count, physicalDevices.data() );
-    
+
+    deviceExtensions = {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+        VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+        VK_KHR_RAY_QUERY_EXTENSION_NAME,
+        VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
+        VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME
+    };
+
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
     std::vector<VkSurfaceFormatKHR> surfaceFormats;
     std::vector<VkPresentModeKHR>   presentModes;
     int graphicQueueIndex = 0;
     int presentQueueIndex = 0;
-
+    bool supportedDevice = false;
     for ( const auto& tempDevice : physicalDevices ) {
         VkPhysicalDeviceProperties properties;
         vkGetPhysicalDeviceProperties( tempDevice, &properties );
         LOG( properties.deviceName );
 
-        VkPhysicalDeviceFeatures supportedFeatures;
-        vkGetPhysicalDeviceFeatures( tempDevice, &supportedFeatures );
+        VkPhysicalDeviceBufferDeviceAddressFeatures bufferDeviceAdressFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES };
+        VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
+        VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
+        VkPhysicalDeviceRayQueryFeaturesKHR rayQueryFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR };
+        VkPhysicalDeviceHostQueryResetFeatures queryResetFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES };
+        rayQueryFeature.pNext = &queryResetFeature;
+        rayTracingFeature.pNext = &rayQueryFeature;
+        accelerationFeature.pNext = &rayTracingFeature;
+        bufferDeviceAdressFeature.pNext = &accelerationFeature;
+        VkPhysicalDeviceFeatures2 supportedFeatures{};
+        supportedFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        supportedFeatures.pNext = &bufferDeviceAdressFeature;
+        vkGetPhysicalDeviceFeatures2( tempDevice, &supportedFeatures );
 
         physicalDevice = tempDevice;
         surfaceFormats    = GetSurfaceFormatKHR( tempDevice, m_surface );
@@ -183,7 +196,17 @@ void App::pickPhysicalDevice() {
         bool extensionSupported = CheckDeviceExtensionSupport( tempDevice, deviceExtensions );
 
         if ( swapchainAdequate && hasFamilyIndex && extensionSupported &&
-            supportedFeatures.samplerAnisotropy ) break;
+            supportedFeatures.features.samplerAnisotropy &&
+            bufferDeviceAdressFeature.bufferDeviceAddress &&
+            accelerationFeature.accelerationStructure &&
+            rayTracingFeature.rayTracingPipeline &&
+            rayQueryFeature.rayQuery &
+            queryResetFeature.hostQueryReset) {
+            supportedDevice = true;
+        };
+    }
+    if ( !supportedDevice ) {
+        RUNTIME_ERROR("no supported device");
     }
     m_physicalDevice = physicalDevice;
     m_surfaceFormats = surfaceFormats;
@@ -206,19 +229,40 @@ void App::createLogicalDevice() {
         queueInfos.push_back(queueInfo);
     }
 
-    VkPhysicalDeviceFeatures deviceFeatures{};
-    deviceFeatures.samplerAnisotropy = VK_TRUE;
-    deviceFeatures.multiViewport     = VK_TRUE;
+    VkPhysicalDeviceHostQueryResetFeatures queryResetFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES };
+    queryResetFeature.hostQueryReset = VK_TRUE;
+
+    VkPhysicalDeviceRayQueryFeaturesKHR rayQueryFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR };
+    rayQueryFeature.pNext = &queryResetFeature;
+    rayQueryFeature.rayQuery = VK_TRUE;
+
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
+    rayTracingFeature.pNext = &rayQueryFeature;
+    rayTracingFeature.rayTracingPipeline = VK_TRUE;
+
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
+    accelerationFeature.pNext = &rayTracingFeature;
+    accelerationFeature.accelerationStructure = VK_TRUE;
+
+    VkPhysicalDeviceBufferDeviceAddressFeatures bufferDeviceAdressFeature{};
+    bufferDeviceAdressFeature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+    bufferDeviceAdressFeature.bufferDeviceAddress = VK_TRUE;
+    bufferDeviceAdressFeature.pNext = &accelerationFeature;
+
+    VkPhysicalDeviceFeatures2 deviceFeatures2{};
+    deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    deviceFeatures2.features.samplerAnisotropy = VK_TRUE;
+    deviceFeatures2.pNext = &bufferDeviceAdressFeature;
 
     VkDeviceCreateInfo deviceInfo{};
     deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     deviceInfo.queueCreateInfoCount     = UINT32(queueInfos.size());
     deviceInfo.pQueueCreateInfos        = queueInfos.data();
-    deviceInfo.pEnabledFeatures         = &deviceFeatures;
     deviceInfo.enabledExtensionCount    = UINT32(deviceExtensions.size());
     deviceInfo.ppEnabledExtensionNames  = deviceExtensions.data();
     deviceInfo.enabledLayerCount        = UINT32(validationLayers.size());
     deviceInfo.ppEnabledLayerNames      = validationLayers.data();
+    deviceInfo.pNext = &deviceFeatures2;
 
     VkResult result = vkCreateDevice( m_physicalDevice, &deviceInfo, nullptr, &m_device );
     CHECK_VKRESULT( result, "failed to create logical device" );

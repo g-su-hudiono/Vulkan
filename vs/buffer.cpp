@@ -52,10 +52,15 @@ void Buffer::allocateBufferMemory() {
                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     
+    VkMemoryAllocateFlagsInfo flagInfo{};
+    flagInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
+    flagInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize  = memoryRequirements.size;
     allocInfo.memoryTypeIndex = memoryTypeIndex;
+    allocInfo.pNext           = &flagInfo;
     
     VkDeviceMemory bufferMemory;
     VkResult       result = vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory);

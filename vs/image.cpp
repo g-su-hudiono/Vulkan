@@ -37,12 +37,12 @@ void Image::createForSwapchain(VkImage image, VkFormat imageFormat) {
     CHECK_VKRESULT(result, "failed to create image views!");
 }
 
-void Image::createForDepth(Size<int32_t> size, int32_t mipLevels) {
+void Image::createForDepth(Size<int32_t> size) {
     VkFormat        depthFormat = ChooseDepthFormat( m_physicalDevice );
     VkImageCreateInfo imageInfo = GetDefaultImageCreateInfo();
     imageInfo.extent.width  = size.width;
     imageInfo.extent.height = size.height;
-    imageInfo.mipLevels     = mipLevels;
+    imageInfo.mipLevels     = 1;
     imageInfo.format        = depthFormat;
     imageInfo.usage         = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     
@@ -59,6 +59,32 @@ void Image::createForDepth(Size<int32_t> size, int32_t mipLevels) {
 
     result = vkCreateImageView(m_device, &imageViewInfo, nullptr, &m_imageView);
     CHECK_VKRESULT(result, "failed to create image views!");
+}
+
+void Image::createForOffscreen(Size<int32_t> size) {
+    VkImageCreateInfo imageInfo = GetDefaultImageCreateInfo();
+    imageInfo.extent.width  = size.width;
+    imageInfo.extent.height = size.height;
+    imageInfo.mipLevels     = 1;
+    imageInfo.format        = VK_FORMAT_R32G32B32A32_SFLOAT;
+    imageInfo.usage         = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
+        | VK_IMAGE_USAGE_STORAGE_BIT;
+    
+    VkResult result = vkCreateImage(m_device, &imageInfo, nullptr, &m_image);
+    CHECK_VKRESULT(result, "failed to create image!");
+
+    allocateImageMemory();
+
+    VkImageViewCreateInfo imageViewInfo = GetDefaultImageViewCreateInfo();
+    imageViewInfo.image  = m_image;
+    imageViewInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    imageViewInfo.subresourceRange.levelCount = 1;
+    imageViewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+    result = vkCreateImageView(m_device, &imageViewInfo, nullptr, &m_imageView);
+    CHECK_VKRESULT(result, "failed to create image views!");
+
+    createSampler();
 }
 
 void Image::allocateImageMemory() {
@@ -84,10 +110,41 @@ void Image::allocateImageMemory() {
     m_imageMemory = imageMemory;
 }
 
+void Image::createSampler() {
+    VkSamplerCreateInfo samplerInfo{};
+    samplerInfo.sType        = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter    = VK_FILTER_LINEAR;
+    samplerInfo.minFilter    = VK_FILTER_LINEAR;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.anisotropyEnable = VK_TRUE;
+    samplerInfo.maxAnisotropy    = 16.0f;
+    samplerInfo.borderColor      = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.compareEnable    = VK_FALSE;
+    samplerInfo.compareOp        = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode       = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias       = 0.0f;
+    samplerInfo.minLod           = 0.0f;
+    samplerInfo.maxLod           = 1;
+    
+    VkResult  result = vkCreateSampler(m_device, &samplerInfo, nullptr, &m_sampler );
+    CHECK_VKRESULT(result, "failed to create texture sampler!");
+}
 
 VkImage         Image::getImage      () { return m_image;       }
 VkImageView     Image::getImageView  () { return m_imageView;   }
 VkDeviceMemory  Image::getImageMemory() { return m_imageMemory; }
+
+VkDescriptorImageInfo Image::getDescriptor()
+{
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    imageInfo.imageView   = m_imageView;
+    imageInfo.sampler     = m_sampler;
+    return imageInfo;
+}
 
 
 // Private ==================================================
@@ -138,17 +195,3 @@ VkImageViewCreateInfo Image::GetDefaultImageViewCreateInfo() {
     return imageViewInfo;
 }
 
-VkImageMemoryBarrier Image::GetDefaultImageMemoryBarrier() {
-    VkImageMemoryBarrier barrier{};
-    barrier.sType     = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
-    barrier.subresourceRange.baseMipLevel   = 0;
-    barrier.subresourceRange.levelCount     = 1;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount     = 1;
-    barrier.srcAccessMask = 0;
-    barrier.dstAccessMask = 0;
-    return barrier;
-}

@@ -10,6 +10,9 @@
 #include "image.h"
 #include "camera.h"
 
+#define WIDTH   800
+#define HEIGHT  600
+
 struct UniformBuffer {
     glm::mat4 model;
     glm::mat4 view;
@@ -37,13 +40,10 @@ private:
     
     void initWindow();
     void initVulkan();
-    
-    Shader* m_vertexShader;
-    Shader* m_pixelShader;
-    void createShader();
 
     Mesh* m_pCube;
-    Mesh* m_pFloor;
+    Mesh* m_pPlane;
+    Mesh* m_pQuad;
     void createGeometry();
     
     VkExtent2D m_extent;
@@ -55,11 +55,11 @@ private:
     void createRenderPass();
 
     uint32_t m_totalFrame = 0;
-    Image* m_depthImage;
+    Image*   m_depthImage;
+    Buffer*  m_uniformBuffer;
     std::vector<VkCommandBuffer> m_cmdBuffers;
     std::vector<Image*>        m_fbImages;
     std::vector<VkFramebuffer> m_fb;
-    std::vector<Buffer*>       m_uniformBuffer;
     std::vector<VkSemaphore>   m_imageSemaphores;
     std::vector<VkSemaphore>   m_renderSemaphores;
     std::vector<VkFence>       m_commandFences;
@@ -69,17 +69,71 @@ private:
     VkDescriptorSetLayout        m_descSetLayout = VK_NULL_HANDLE;
     VkDescriptorSet              m_descSet;
     VkDescriptorSetLayoutBinding m_descLayoutBinding;
-    VkWriteDescriptorSet         m_writeDescSet;
-    void createDescriptor();
+    void createOffscreenDescriptorSet();
+    void updateOffscreenDescriptorSet();
 
-    VkPipeline m_pipeline;
-    VkPipelineLayout m_pipelineLayout;
-    void createPipeline();
 
     UniformBuffer m_mvp{};
     uint32_t m_currentFrame = 0;
     Camera* m_camera;
     void process();
+    
+    VkDescriptorPool             m_postDescPool      = VK_NULL_HANDLE;
+    VkDescriptorSetLayout        m_postDescSetLayout = VK_NULL_HANDLE;
+    VkDescriptorSet              m_postDescSet;
+    VkDescriptorSetLayoutBinding m_postDescLayoutBinding;
+
+    VkPipeline       m_postPipeline;
+    VkPipelineLayout m_postPipelineLayout;
+
+    void createPostDescriptor();
+    void createPostPipeline();
+    void updatePostDescriptorSet();
+
+    // offscreen.cpp
+    VkRenderPass m_offscreenRenderPass = VK_NULL_HANDLE;
+    void createOffscreenRenderPass();
+
+    Image*  m_offscreenImage;
+    Image*  m_offscreenDepth;
+    Buffer* m_offscreenUniformBuffer;
+    VkFramebuffer m_offscreenFramebuffer;
+    void createOffscreenFramedata();
+
+    VkPipeline m_offscreenPipeline;
+    VkPipelineLayout m_offscreenPipelineLayout;
+    void createOffscreenPipeline();
+
+    // vkray.cpp
+    VkPhysicalDeviceRayTracingPipelinePropertiesKHR m_rtProperties;
+    VkAccelerationStructureKHR m_blAccelStructure;
+    VkAccelerationStructureKHR m_tlAccelStructure;
+
+    VkDescriptorPool      m_rtDescPool      = VK_NULL_HANDLE;
+    VkDescriptorSetLayout m_rtDescSetLayout = VK_NULL_HANDLE;
+    VkDescriptorSet       m_rtDescSet       = VK_NULL_HANDLE;
+
+    std::vector<VkRayTracingShaderGroupCreateInfoKHR> m_rtShaderGroups;
+
+    VkPipeline       m_rtPipeline;
+    VkPipelineLayout m_rtPipelineLayout;
+
+    Buffer* m_rtSBTBuffer;
+
+    struct RtPushConstant
+    {
+        glm::vec4 clearColor;
+        glm::vec3 lightPosition;
+        float     lightIntensity{ 100.0f };
+        int       lightType{ 0 };
+    } m_rtPushConstants;
+
+    void initRayTracing();
+    void createBottomLevelAS();
+    void createTopLevelAS();
+    void createRtDescriptorSet();
+    void createRtPipeline();
+    void createRtShaderBindingTable();
     
     // device.cpp
     std::vector<const char*> deviceExtensions;

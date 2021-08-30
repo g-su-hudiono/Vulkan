@@ -30,6 +30,14 @@ void Mesh::createPlane() {
     m_indices   = { 0, 1, 2, 2, 3, 0 };
 }
 
+void Mesh::createQuad() {
+    m_positions = {{-1., 1., 0.}, { 1., 1., 0.}, { 1., -1., 0.}, {-1., -1., 0.}};
+    m_normals   = {{ 0., 1., 0.}, { 0., 1., 0.}, { 0., 1.,  0.}, { 0., 1.,  0.}};
+    m_colors    = {{ 1., 1., 1.}, { 1., 1., 1.}, { 1., 1.,  1.}, { 1., 1.,  1.}};
+    m_texCoords = {{0, 1}, {1, 1}, {1, 0}, {0, 0}};
+    m_indices   = { 0, 1, 2, 2, 3, 0 };
+}
+
 void Mesh::createCube() {
     glm::vec3 cubeVertices[8] = {
         {-.5,  .5,  .5}, {-.5, -.5,  .5}, { .5,  .5,  .5}, { .5, -.5,  .5},
@@ -77,7 +85,10 @@ void Mesh::cmdCreateVertexBuffer() {
     VkDeviceSize bufferSize = sizeofPositions() + sizeofNormals() + sizeofColors();
     
     Buffer* vertexBuffer = new Buffer( m_device, m_physicalDevice );
-    vertexBuffer->setup(bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT );
+    vertexBuffer->setup(bufferSize, 
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | 
+        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR );
     vertexBuffer->create();
     
     int32_t shift = 0;
@@ -97,7 +108,10 @@ void Mesh::cmdCreateIndexBuffer() {
     VkDeviceSize bufferSize = sizeofIndices();
     
     Buffer* indexBuffer = new Buffer( m_device, m_physicalDevice );
-    indexBuffer->setup(bufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT );
+    indexBuffer->setup(bufferSize, 
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT | 
+        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR );
     indexBuffer->create();
     indexBuffer->fillBufferFull(m_indices.data());
     
