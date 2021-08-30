@@ -15,7 +15,7 @@ void App::run() {
 
 void App::cleanup() {
     m_pCube->cleanup();
-    m_pFloor->cleanup();
+    m_pPlane->cleanup();
     m_uniformBuffer->cleanup();
 
     for ( size_t i = 0; i < m_imageSemaphores.size(); i++ ) {
@@ -67,15 +67,15 @@ void App::initVulkan() {
 
     createSwapchain();
     createRenderPass();
-    
-    createFrameData();
+
     createGeometry();
+    createFrameData();
 
     createOffscreenRenderPass();
     createOffscreenFramedata();
 
     createDescriptorSet();
-    createGraphicsPipeline();
+    createOffscreenPipeline();
     updateDescriptorSet();
 
     m_camera = new Camera();
@@ -102,10 +102,10 @@ void App::createGeometry() {
     m_pCube->cmdCreateVertexBuffer();
     m_pCube->cmdCreateIndexBuffer();
 
-    m_pFloor = new Mesh( m_device, m_physicalDevice );
-    m_pFloor->createPlane();
-    m_pFloor->cmdCreateVertexBuffer();
-    m_pFloor->cmdCreateIndexBuffer();
+    m_pPlane = new Mesh( m_device, m_physicalDevice );
+    m_pPlane->createPlane();
+    m_pPlane->cmdCreateVertexBuffer();
+    m_pPlane->cmdCreateIndexBuffer();
 
     m_pQuad = new Mesh( m_device, m_physicalDevice );
     m_pQuad->createQuad();
@@ -167,6 +167,7 @@ void App::createRenderPass() {
     colorAttachment.format          = m_surfaceFormat;
     colorAttachment.samples         = VK_SAMPLE_COUNT_1_BIT;
     colorAttachment.loadOp          = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.initialLayout   = VK_IMAGE_LAYOUT_UNDEFINED;
     colorAttachment.finalLayout     = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     
     VkAttachmentDescription depthAttachment{};
@@ -174,6 +175,7 @@ void App::createRenderPass() {
     depthAttachment.samples         = VK_SAMPLE_COUNT_1_BIT;
     depthAttachment.loadOp          = VK_ATTACHMENT_LOAD_OP_CLEAR;
     depthAttachment.stencilLoadOp   = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachment.initialLayout   = VK_IMAGE_LAYOUT_UNDEFINED;
     depthAttachment.finalLayout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     
     std::array<VkAttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
@@ -483,23 +485,23 @@ void App::process() {
                 offscreenRenderPassBeginInfo.renderPass      = m_offscreenRenderPass;
                 offscreenRenderPassBeginInfo.framebuffer     = m_offscreenFramebuffer;
                 offscreenRenderPassBeginInfo.renderArea      = {{0, 0}, m_extent};
-
+            
                 vkCmdBeginRenderPass( commandBuffer, &offscreenRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-                vkCmdBindPipeline( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline );
+                vkCmdBindPipeline( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_offscreenPipeline );
                 vkCmdBindDescriptorSets( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, 
-                                         m_pipelineLayout, 0, 1, &m_descSet, 0, nullptr );
-
+                                         m_offscreenPipelineLayout, 0, 1, &m_descSet, 0, nullptr );
+            
                 VkBuffer vertexBuffers[] = {m_pCube->m_vertexBuffer->m_buffer};
                 VkBuffer indexBuffers    = m_pCube->m_indexBuffer->m_buffer;
                 uint32_t indexSize       = UINT32( m_pCube->m_indices.size());
                 
                 vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
                 vkCmdBindIndexBuffer  (commandBuffer, indexBuffers, 0, VK_INDEX_TYPE_UINT32);
-
+            
                 vkCmdDrawIndexed(commandBuffer, indexSize, 1, 0, 0, 0);
-
+            
                 vkCmdEndRenderPass( commandBuffer );
-
+            
             }
             {
                 VkRenderPassBeginInfo postRenderPassBeginInfo{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
@@ -511,11 +513,13 @@ void App::process() {
 
                 // Rendering tonemapper
                 vkCmdBeginRenderPass( commandBuffer, &postRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+                vkCmdBindPipeline( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_postPipeline );
+                vkCmdBindDescriptorSets( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, 
+                                         m_postPipelineLayout, 0, 1, &m_postDescSet, 0, nullptr );
 
                 auto aspectRatio = static_cast< float >( WIDTH ) / static_cast< float >( HEIGHT );
                 vkCmdPushConstants( commandBuffer, m_postPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( float ), &aspectRatio );
-                vkCmdBindPipeline( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_postPipeline );
-                vkCmdBindDescriptorSets( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_postPipelineLayout, 0, 1, &m_postDescSet, 0, nullptr );
+                
                 vkCmdDraw( commandBuffer, 3, 1, 0, 0 );
 
                 vkCmdEndRenderPass( commandBuffer );

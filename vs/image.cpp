@@ -140,7 +140,7 @@ VkDeviceMemory  Image::getImageMemory() { return m_imageMemory; }
 VkDescriptorImageInfo Image::getDescriptor()
 {
     VkDescriptorImageInfo imageInfo{};
-    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
     imageInfo.imageView   = m_imageView;
     imageInfo.sampler     = m_sampler;
     return imageInfo;
@@ -195,17 +195,3 @@ VkImageViewCreateInfo Image::GetDefaultImageViewCreateInfo() {
     return imageViewInfo;
 }
 
-VkImageMemoryBarrier Image::GetDefaultImageMemoryBarrier() {
-    VkImageMemoryBarrier barrier{};
-    barrier.sType     = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
-    barrier.subresourceRange.baseMipLevel   = 0;
-    barrier.subresourceRange.levelCount     = 1;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount     = 1;
-    barrier.srcAccessMask = 0;
-    barrier.dstAccessMask = 0;
-    return barrier;
-}

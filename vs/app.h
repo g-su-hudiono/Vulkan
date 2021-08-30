@@ -42,7 +42,7 @@ private:
     void initVulkan();
 
     Mesh* m_pCube;
-    Mesh* m_pFloor;
+    Mesh* m_pPlane;
     Mesh* m_pQuad;
     void createGeometry();
     
@@ -72,8 +72,6 @@ private:
     void createDescriptorSet();
     void updateDescriptorSet();
 
-    VkPipeline m_pipeline;
-    VkPipelineLayout m_pipelineLayout;
 
     UniformBuffer m_mvp{};
     uint32_t m_currentFrame = 0;
@@ -102,7 +100,9 @@ private:
     VkFramebuffer m_offscreenFramebuffer;
     void createOffscreenFramedata();
 
-    void createGraphicsPipeline();
+    VkPipeline m_offscreenPipeline;
+    VkPipelineLayout m_offscreenPipelineLayout;
+    void createOffscreenPipeline();
 
     // vkray.cpp
     VkPhysicalDeviceRayTracingPipelinePropertiesKHR m_rtProperties;
